@@ -49,3 +49,11 @@
   - LinkedIn uses Kafka to prevent spam, collect user interactions to make better connection recommendations in real time.
 
 ---
+
+# Kafka Theory
+
+## Topics
+
+- Topics: A particular stream of data.
+
+<img src="./pics/truck-gps.png" width="80%" />
