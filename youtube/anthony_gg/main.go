@@ -8,9 +8,49 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-func main() {
-	topic := "HVSE" // Kafka topic to produce messages to
+const topic = "HVSE"
 
+type OrderPlacer struct {
+	producer *kafka.Producer
+	topic    string
+	// Channel for delivery reports from Kafka regarding the status of the
+	// produced message to ensure successful message delivery
+	deliverych chan kafka.Event
+}
+
+func NewOrderPlacer(p *kafka.Producer, topic string) *OrderPlacer {
+	return &OrderPlacer{
+		producer:   p,
+		topic:      topic,
+		deliverych: make(chan kafka.Event, 10000),
+	}
+}
+
+func (op *OrderPlacer) placeOrder(orderType string, size int) error {
+	var (
+		format  = fmt.Sprintf("%s - %d", orderType, size)
+		payload = []byte(format)
+	)
+
+	err := op.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &op.topic, Partition: kafka.PartitionAny},
+		Value:          payload,
+	},
+		op.deliverych,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Waiting for the delivery report from Kafka and printing its details
+	<-op.deliverych
+
+	fmt.Printf("placed order on the queue --> %s\n", format)
+
+	return nil
+}
+
+func main() {
 	// Creating a new Kafka producer
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092", // Kafka broker address
@@ -21,56 +61,13 @@ func main() {
 		fmt.Printf("Failed to create producer: %s\n", err)
 	}
 
-	// Kafka Consumer
-	go func() {
-		// Creating a new Kafka consumer
-		consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-			"bootstrap.servers": "localhost:9092", // Kafka broker address
-			"group.id":          "website",        // Consumer group ID
-			"auto.offset.reset": "smallest",       // Reset offset to earliest available message
-		})
-		if err != nil {
+	op := NewOrderPlacer(p, topic)
+
+	for i := 0; i < 1000; i++ {
+		if err := op.placeOrder("BUY", i+1); err != nil {
 			log.Fatal(err)
 		}
-
-		// Subscribing to the Kafka topic to consume messages
-		if err = consumer.Subscribe(topic, nil); err != nil {
-			log.Fatal(err)
-		}
-
-		// Continuous polling for new messages
-		for {
-			// Polling Kafka for events (messages or errors) every 100ms
-			ev := consumer.Poll(100)
-			switch e := ev.(type) {
-			case *kafka.Message:
-				// Handling consumed Kafka messages
-				fmt.Printf("Consumed message from the queue: %s\n", string(e.Value))
-			case *kafka.Error:
-				// Handling Kafka errors, if any
-				fmt.Printf("%v\n", e)
-			}
-		}
-	}()
-
-	// Channel for delivery reports from Kafka regarding the status of the
-	// produced message to ensure successful message delivery
-	deliverch := make(chan kafka.Event, 10000)
-
-	for {
-		// Producing a Kafka message with payload "FOO" to the specified topic
-		err = p.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte("FOO"), // Payload of the message
-		},
-			deliverch,
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Waiting for the delivery report from Kafka and printing its details
-		<-deliverch
 		time.Sleep(time.Second * 3)
 	}
+
 }
