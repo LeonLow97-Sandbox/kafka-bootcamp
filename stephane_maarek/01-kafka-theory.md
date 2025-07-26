@@ -81,6 +81,16 @@
 
 - Can compress message to make them small.
 
+| Field     | Description                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key       | Optional identifier used to control **partitioning** and maintain **order**. Same key --> same partition. Often used for grouping (e.g., UserID). |
+| Value     | The actual **payload** (can be JSON, Avro, Protobuf, string, binary, etc.). Always **required**.                                                  |
+| Headers   | Optional key-value pairs used for **metadata** (e.g., tracing info, content type)                                                                 |
+| Timestamp | Create time (set by producer) or Log append time (set by Kafka broker).                                                                           |
+| Offset    | Kafka-managed, **monotonically increasing number** per partition. Acts as a cursor for consumers.                                                 |
+| Partition | Kafka uses the message key + partitioner to assign each message to a specific partition.                                                          |
+| Topic     | Logical grouping of messages. Producers write to, and consumers read from, topics.                                                                |
+
 ## Kafka Message Serializer
 
 <p align="center">
@@ -318,7 +328,7 @@
 
 # Zookeeper
 
-- Zookeeper manages broekrs (keeps a list of them)
+- Zookeeper manages brokers (keeps a list of them)
 - Zookeeper helps in performing leader election for partitions (whenever kafka broker goes down)
 - Zookeeper sends notifications to Kafka in case of changes (e.g., new topic, broker dies, broker comes up, delete topics, etc...)
 - **Kafka 2.x**: can't work without Zookeeper
